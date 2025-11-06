@@ -1,7 +1,7 @@
 name = "TSPDrone"
 uuid = "ec3913bb-036d-4a1d-a51c-80e93297dcf2"
 authors = ["Changhyun Kwon <chkwon@gmail.com> and contributors"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 Concorde = "df6a336b-a67f-4155-81fc-4f05fe893652"
