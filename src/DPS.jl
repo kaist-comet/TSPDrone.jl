@@ -7,7 +7,8 @@ function divide_partition_search(
     local_search_methods::Vector{Function} = Function[two_point_move, one_point_move, two_opt_move], 
     flying_range::Float64 = MAX_DRONE_RANGE, 
     time_limit::Float64 = MAX_TIME_LIMIT,
-    initial_tour::Union{Vector{Int}, Nothing}=nothing
+    initial_tour::Union{Vector{Int}, Nothing}=nothing,
+    drone_eligible::Union{Nothing,Set{Int}}=nothing
 )
 
     time0 = time()
@@ -49,8 +50,19 @@ function divide_partition_search(
         Ct_ = Ct[group_nodes, group_nodes]
         Cd_ = Cd[group_nodes, group_nodes]
         init_tour = collect(1:length(group_nodes))
+        
+        # Map drone_eligible to group node indices (1-based in group)
+        group_eligible = nothing
+        if drone_eligible !== nothing && !isempty(drone_eligible)
+            group_eligible = Set{Int}()
+            for (idx, orig_node) in enumerate(group_nodes)
+                if orig_node in drone_eligible
+                    push!(group_eligible, idx)  # idx is 1-based position in group
+                end
+            end
+        end
     
-        tspd_len, t_route_idx, d_route_idx = tsp_ep_all(Ct_, Cd_, init_tour; local_search_methods=local_search_methods, flying_range=flying_range, time_limit=time_limit_each_group)   
+        tspd_len, t_route_idx, d_route_idx = tsp_ep_all(Ct_, Cd_, init_tour; local_search_methods=local_search_methods, flying_range=flying_range, time_limit=time_limit_each_group, drone_eligible=group_eligible)   
         
         total_tspd_len += tspd_len
         append!(total_t_route, group_nodes[t_route_idx])

@@ -137,7 +137,9 @@ Optional keyword arguments for `solve_tspd`:
 n_groups::Int = 1, 
 method::String = "TSP-ep-all", 
 flying_range::Float64 = MAX_DRONE_RANGE, 
-time_limit::Float64 = MAX_TIME_LIMIT
+time_limit::Float64 = MAX_TIME_LIMIT,
+initial_tour::Union{Vector{Int}, Nothing} = nothing,
+drone_eligible::Union{Nothing, Set{Int}} = nothing
 ```
 * `n_groups`: The number of subgroups for divide and conquer. For example, if `n=100` and `n_groups=4`, then each group will have `25` nodes. Then, `method` is applied for each group. 
 * `method`: can be one of the following (See [Agatz et al. 2018](https://doi.org/10.1287/trsc.2017.0791)):
@@ -147,7 +149,9 @@ time_limit::Float64 = MAX_TIME_LIMIT
     - `"TSP-ep-2opt"`: All possible 2-opt exchange moves.
     - `"TSP-ep-all"`: All possible 1p, 2p, and 2opt moves.
 * `flying_range`: The limited flying range of the drone. The default value is `Inf`. The flying range is compared with the values in the drone cost matrix; that is, `drone_cost_mtx` or the Euclidean distance multiplied by `drone_cost_factor`. 
-* `time_limit`: The total time limit to solve the problem in seconds. For each group, the time limit is split equally. For example, if `time_limit=3600.0` and `n_groups=5`, then each group has time limit of 3600/5 = 720 seconds. 
+* `time_limit`: The total time limit to solve the problem in seconds. For each group, the time limit is split equally. For example, if `time_limit=3600.0` and `n_groups=5`, then each group has time limit of 3600/5 = 720 seconds.
+* `initial_tour`: Optional initial TSP tour. If `nothing`, a TSP tour is computed using Concorde. The tour should start at node 1 and end at node `n+1` (dummy depot). If the final depot is missing, it will be added automatically.
+* `drone_eligible`: Set of nodes that can be served by the drone. If `nothing`, all nodes are eligible. Nodes not in this set will only be served by the truck. 
 
 
 

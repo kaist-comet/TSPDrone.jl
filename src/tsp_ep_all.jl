@@ -28,7 +28,7 @@ function precompute_dist_order(Cd)
     end
     return precomputed_order
 end
-function exact_partitioning(initial_tour, Ct, Cd; flying_range=MAX_DRONE_RANGE, quadratic_ep_boost=true, precomputed_order=nothing)
+function exact_partitioning(initial_tour, Ct, Cd; flying_range=MAX_DRONE_RANGE, quadratic_ep_boost=true, precomputed_order=nothing, drone_eligible::Union{Nothing,Set{Int}}=nothing)
     n, _ = size(Ct)
 
     r = initial_tour
@@ -47,10 +47,18 @@ function exact_partitioning(initial_tour, Ct, Cd; flying_range=MAX_DRONE_RANGE, 
     for i in 1:n
         inv_r[r[i]] = i
     end
+    
+    # Check if node is eligible for drone service
+    @inline is_drone_eligible(k_node::Int) = (drone_eligible === nothing || k_node in drone_eligible)
+    
     if quadratic_ep_boost
         if flying_range == MAX_DRONE_RANGE
             @inbounds for i in 1:n-2
                 @inbounds for k in i+1:n-1
+                    k_node = r[k]
+                    if !is_drone_eligible(k_node)
+                        continue
+                    end
                     for j = k+1:n
                         t_cost = sum_Ct[i, k-1] + Ct[r[k-1], r[k+1]] + sum_Ct[k+1, j]
                         d_cost = Cd[r[i], r[k]] + Cd[r[k], r[j]]
@@ -72,6 +80,9 @@ function exact_partitioning(initial_tour, Ct, Cd; flying_range=MAX_DRONE_RANGE, 
             J = Vector{Int}(undef, n)
             for k_tour in 2:n-1
                 k_node = r[k_tour]
+                if !is_drone_eligible(k_node)
+                    continue
+                end
                 @simd for j in k_tour:n
                     J[j] = j+1
                 end
@@ -109,6 +120,10 @@ function exact_partitioning(initial_tour, Ct, Cd; flying_range=MAX_DRONE_RANGE, 
         @inbounds for i in 1:n-1
             @inbounds for j in i+1:n
                 @inbounds for k in i+1:j-1
+                    k_node = r[k]
+                    if !is_drone_eligible(k_node)
+                        continue
+                    end
                     d_cost = Cd[r[i], r[k]] + Cd[r[k], r[j]]
                     if d_cost <= flying_range
                         t_cost = sum_Ct[i, k-1] + Ct[r[k-1], r[k+1]] + sum_Ct[k+1, j]
@@ -204,7 +219,8 @@ function tsp_ep_all(
     flying_range=MAX_DRONE_RANGE, 
     time_limit=MAX_TIME_LIMIT,
     quadratic_ep_boost=true,
-    initial_tour::Union{Vector{Int}, Nothing}=nothing
+    initial_tour::Union{Vector{Int}, Nothing}=nothing,
+    drone_eligible::Union{Nothing,Set{Int}}=nothing
 )    
     """
     Runs `TSP-ep-all` heuristic algorithm of Agatz et al.
@@ -213,6 +229,7 @@ function tsp_ep_all(
     `truck_cost_factor`: as defined in Agatz et al. instances
     `drone_cost_factor`: as defined in Agatz et al. instances
     `initial_tour`: optional initial TSP tour (if provided, skips TSP tour generation)
+    `drone_eligible`: Set of nodes that can be served by drone (if nothing, all nodes are eligible)
     """
 
     Ct, Cd = cost_matrices_with_dummy(x_coordinates, y_coordinates, truck_cost_factor, drone_cost_factor)
@@ -232,7 +249,7 @@ function tsp_ep_all(
         end
     end
 
-    return tsp_ep_all(Ct, Cd, tsp_tour, flying_range=flying_range, local_search_methods=local_search_methods, time_limit=time_limit, quadratic_ep_boost=quadratic_ep_boost)
+    return tsp_ep_all(Ct, Cd, tsp_tour, flying_range=flying_range, local_search_methods=local_search_methods, time_limit=time_limit, quadratic_ep_boost=quadratic_ep_boost, drone_eligible=drone_eligible)
 end
 
 
@@ -243,13 +260,14 @@ function tsp_ep_all(
     local_search_methods=[two_point_move, one_point_move, two_opt_move], 
     flying_range=MAX_DRONE_RANGE, 
     time_limit=MAX_TIME_LIMIT,
-    quadratic_ep_boost=true
+    quadratic_ep_boost=true,
+    drone_eligible::Union{Nothing,Set{Int}}=nothing
 )   
     n, _ = size(Ct)
 
     improved = true
     precomputed_order = (quadratic_ep_boost && flying_range != MAX_DRONE_RANGE) ? precompute_dist_order(Cd) : nothing
-    best_obj, t_route, d_route = exact_partitioning(init_tour, Ct, Cd, flying_range=flying_range, quadratic_ep_boost=quadratic_ep_boost, precomputed_order=precomputed_order)
+    best_obj, t_route, d_route = exact_partitioning(init_tour, Ct, Cd, flying_range=flying_range, quadratic_ep_boost=quadratic_ep_boost, precomputed_order=precomputed_order, drone_eligible=drone_eligible)
 
     best_tour = copy(init_tour)
     best_t_route = copy(t_route)
@@ -285,7 +303,7 @@ function tsp_ep_all(
                     is_time_over = time() - time0 > time_limit 
 
                     if is_valid
-                        ep_time, t_route, d_route = exact_partitioning(new_tour, Ct, Cd, flying_range=flying_range, quadratic_ep_boost=quadratic_ep_boost, precomputed_order=precomputed_order)
+                        ep_time, t_route, d_route = exact_partitioning(new_tour, Ct, Cd, flying_range=flying_range, quadratic_ep_boost=quadratic_ep_boost, precomputed_order=precomputed_order, drone_eligible=drone_eligible)
                         if ep_time < cur_best_obj
                             cur_best_tour = copy(new_tour)
                             cur_best_t_route = copy(t_route)
